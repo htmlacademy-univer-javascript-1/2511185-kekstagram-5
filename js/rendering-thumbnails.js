@@ -1,4 +1,5 @@
 import { createPhotosArray } from './data.js';
+import { openBigPicture } from './big-picture.js';
 
 const pictureTemplateContent = document.querySelector('#picture').content.querySelector('a');
 
@@ -19,6 +20,11 @@ createdPictures.forEach(({url, description, likes, comments}) => {
     pictureComments.textContent = comments;
 
     fragment.appendChild(pictureElement);
+
+    pictureElement.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      openBigPicture(url, description, likes, comments);
+    });
 });
 
 const picturesContainer = document.querySelector('.pictures');

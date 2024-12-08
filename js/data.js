@@ -73,6 +73,6 @@ const createPhotosArray = () => {
 
 const photosArray = createPhotosArray();
 
-export default { createPhotosArray };
+export { createPhotosArray };
 export { photosArray };
 
