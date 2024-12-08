@@ -1,3 +1,3 @@
-import {photosArray} from './data.js';
+import { photosArray } from './data.js';
 
-// console.log(JSON.stringify(photosArray, null, 2));
+console.log(JSON.stringify(photosArray, null, 2));
