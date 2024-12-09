@@ -8,12 +8,18 @@ const commentCounter = bigPicture.querySelector('.social__comment-count');
 
 let commentCount = 0;
 
+let handleCommentsLoaderClick;
+
 const isEscapeKey = (evt) => evt.key === 'Escape';
 
 function handleEscapeKey(event) {
   if (isEscapeKey(event)) {
     closeBigPicture();
   }
+}
+
+function updateCommentCounter(currentCount, totalCount) {
+  commentCounter.textContent = `${currentCount} из ${totalCount} комментариев`;
 }
 
 function showElements(comments, count) {
@@ -42,6 +48,7 @@ function closeBigPicture() {
 
   document.removeEventListener('keydown', handleEscapeKey);
   closeButton.removeEventListener('click', closeBigPicture);
+  commentsLoaderButton.removeEventListener('click', handleCommentsLoaderClick);
 
   commentList.innerHTML = '';
   commentCounter.textContent = '';
@@ -53,8 +60,20 @@ function openBigPicture(url, description, likes, comments) {
   bigPicture.querySelector('.likes-count').textContent = likes;
   bigPicture.querySelector('.social__caption').textContent = description;
   commentCount = Math.min(comments.length, 5);
-
+  updateCommentCounter(commentCount, comments.length);
   comments.forEach((comment) => createCommentElement(comment));
+
+  handleCommentsLoaderClick = () => {
+    commentCount = Math.min(commentCount + 5, comments.length);
+    showElements(commentList.children, commentCount);
+    if (commentCount === comments.length) {
+      commentsLoaderButton.style.display = 'none';
+    }
+    updateCommentCounter(commentCount, comments.length);
+  };
+
+  commentsLoaderButton.addEventListener('click', handleCommentsLoaderClick);
+  commentsLoaderButton.style.display = comments.length > 5 ? 'block' : 'none';
 
   showElements(commentList.children, commentCount);
   document.querySelector('body').classList.add('modal-open');
