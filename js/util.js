@@ -18,6 +18,6 @@ const getRandomMessages = (messages) => {
   return Array.from(selectedMessages).join(' ');
 };
 
-export {getRandomInteger};
-export {getRandomArrayElement};
-export {getRandomMessages};
+export { getRandomInteger };
+export { getRandomArrayElement };
+export { getRandomMessages };
