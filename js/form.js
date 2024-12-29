@@ -1,3 +1,5 @@
+import { sendPhotoData } from './api.js';
+
 const uploadInput = document.querySelector('.img-upload__input');
 const uploadOverlay = document.querySelector('.img-upload__overlay');
 const form = document.querySelector('.img-upload__form');
@@ -7,6 +9,15 @@ const commentInput = form.querySelector('.text__description');
 
 const HASHTAG_PATTERN = /^#[A-Za-zА-Яа-я0-9]{1,20}$/;
 let scaleValue = 100;
+
+const pristine = new Pristine(form, {
+  classTo: 'img-upload__field-wrapper',
+  errorClass: 'has-danger',
+  successClass: 'has-success',
+  errorTextParent: 'img-upload__field-wrapper',
+  errorTextTag: 'div',
+  errorTextClass: 'form-error'
+});
 
 const isEscapeKey = (evt) => evt.key === 'Escape';
 
@@ -21,9 +32,10 @@ function closeForm() {
   document.removeEventListener('keydown', handleEscapeKey);
   closeButton.removeEventListener('click', closeForm);
   uploadOverlay.classList.add('hidden');
-  form.reset();
+  form.reset(); // сбрасить форму
   scaleValue = 100;
   updateScale();
+  pristine.reset(); // сбросить проверки
 }
 
 function openForm() {
@@ -33,15 +45,6 @@ function openForm() {
   uploadOverlay.classList.remove('hidden');
   updateScale();
 }
-
-const pristine = new Pristine(form, {
-  classTo: 'img-upload__field-wrapper',
-  errorClass: 'has-danger',
-  successClass: 'has-success',
-  errorTextParent: 'img-upload__field-wrapper',
-  errorTextTag: 'div',
-  errorTextClass: 'form-error'
-});
 
 function validateHashtags(value) {
   if (!value) {
@@ -183,3 +186,36 @@ effectInputs.forEach((input) => {
     updateImage();
   });
 });
+
+const showMessage = (type) => {
+  const template = document.querySelector(`#${type}`).content.querySelector('section');
+  const messageElement = template.cloneNode(true);
+
+  document.body.appendChild(messageElement);
+};
+
+form.addEventListener('submit', async (evt) => {
+  evt.preventDefault();
+
+  const isValid = pristine.validate();
+  if (isValid) {
+    const submitButton = form.querySelector('.img-upload__submit');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Отправка...';
+
+    const formData = new FormData(form);
+    try {
+      await sendPhotoData(formData);
+      showMessage('success');
+      closeForm();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Ошибка при отправке:', error);
+      showMessage('error');
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = 'Опубликовать';
+    }
+  }
+});
+
