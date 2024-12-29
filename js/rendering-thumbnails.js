@@ -32,6 +32,7 @@ const renderThumbnails = async () => {
     const picturesContainer = document.querySelector('.pictures');
     picturesContainer.appendChild(fragment);
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Ошибка загрузки миниатюр:', error);
     // рендеринг сообщения об ошибке
     const errorElement = document.createElement('div');

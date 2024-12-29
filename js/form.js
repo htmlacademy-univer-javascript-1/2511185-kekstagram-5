@@ -191,26 +191,6 @@ const showMessage = (type) => {
   const template = document.querySelector(`#${type}`).content.querySelector('section');
   const messageElement = template.cloneNode(true);
 
-  const closeModal = () => {
-    messageElement.remove();
-    document.removeEventListener('keydown', onEscPress);
-  };
-
-  const onEscPress = (evt) => {
-    if (isEscapeKey(evt)) {
-      evt.preventDefault();
-      closeModal();
-    }
-  };
-
-  messageElement.addEventListener('click', (evt) => {
-    if (evt.target.matches(`.${type}__button`) || evt.target === messageElement) {
-      closeModal();
-    }
-  });
-
-  document.addEventListener('keydown', onEscPress);
-
   document.body.appendChild(messageElement);
 };
 
@@ -229,6 +209,7 @@ form.addEventListener('submit', async (evt) => {
       showMessage('success');
       closeForm();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Ошибка при отправке:', error);
       showMessage('error');
     } finally {

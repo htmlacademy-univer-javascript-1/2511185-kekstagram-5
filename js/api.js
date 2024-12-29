@@ -9,6 +9,7 @@ export const fetchPhotos = async () => {
     }
     return await response.json();
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Ошибка получения данных:', error);
     throw error;
   }
@@ -28,6 +29,7 @@ export const sendPhotoData = async (formData) => {
 
     return await response.json();
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Ошибка отправки данных:', error);
     throw error;
   }
