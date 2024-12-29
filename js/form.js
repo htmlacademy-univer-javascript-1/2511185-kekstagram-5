@@ -1,5 +1,6 @@
 import { sendPhotoData } from './api.js';
 
+
 const uploadInput = document.querySelector('.img-upload__input');
 const uploadOverlay = document.querySelector('.img-upload__overlay');
 const form = document.querySelector('.img-upload__form');
@@ -10,6 +11,7 @@ const commentInput = form.querySelector('.text__description');
 const HASHTAG_PATTERN = /^#[A-Za-zА-Яа-я0-9]{1,20}$/;
 let scaleValue = 100;
 
+// Pristine
 const pristine = new Pristine(form, {
   classTo: 'img-upload__field-wrapper',
   errorClass: 'has-danger',
@@ -32,10 +34,10 @@ function closeForm() {
   document.removeEventListener('keydown', handleEscapeKey);
   closeButton.removeEventListener('click', closeForm);
   uploadOverlay.classList.add('hidden');
-  form.reset(); // сбрасить форму
+  form.reset(); // сброс формы
   scaleValue = 100;
   updateScale();
-  pristine.reset(); // сбросить проверки
+  pristine.reset(); // сброс проверок
 }
 
 function openForm() {
@@ -48,31 +50,27 @@ function openForm() {
 
 function validateHashtags(value) {
   if (!value) {
-    return {valid: true, message: ''};
+    return { valid: true, message: '' };
   }
-
   const hashtags = value.trim().split(/\s+/);
-
   if (hashtags.length > 5) {
-    return {valid: false, message: 'превышено количество хэш-тегов'};
+    return { valid: false, message: 'Превышено количество хэш-тегов' };
   }
-
   for (const hashtag of hashtags) {
     if (!HASHTAG_PATTERN.test(hashtag)) {
-      return {valid: false, message: 'введён невалидный хэш-тег'};
+      return { valid: false, message: 'Введён невалидный хэш-тег' };
     }
   }
-
   const uniqueHashtags = new Set(hashtags.map((hashtag) => hashtag.toLowerCase()));
   if (uniqueHashtags.size !== hashtags.length) {
-    return {valid: false, message: 'хэш-теги повторяются'};
+    return { valid: false, message: 'Хэш-теги повторяются' };
   }
-
-  return {valid: true, message: ''};
+  return { valid: true, message: '' };
 }
 
+// Подключение валидации к Pristine
 pristine.addValidator(hashtagInput, (value) => validateHashtags(value).valid, (value) => validateHashtags(value).message);
-pristine.addValidator(commentInput, (value) => value.length < 140, 'Длина комментария не может составлять больше 140 символов');
+pristine.addValidator(commentInput, (value) => value.length <= 140, 'Длина комментария не может составлять больше 140 символов');
 
 uploadInput.addEventListener('change', () => {
   if (uploadInput.files.length > 0) {
@@ -80,14 +78,50 @@ uploadInput.addEventListener('change', () => {
   }
 });
 
-form.addEventListener('submit', (evt) => {
+// Сообщения об успешной/неуспешной загрузке
+const showMessage = (type) => {
+  const template = document.querySelector(`#${type}`).content.querySelector('section');
+  const messageElement = template.cloneNode(true);
+  const button = messageElement.querySelector('button');
+  button.addEventListener('click', () => messageElement.remove());
+  document.addEventListener('keydown', (evt) => {
+    if (isEscapeKey(evt)) {
+      messageElement.remove();
+    }
+  });
+  document.addEventListener('click', (evt) => {
+    if (evt.target === messageElement) {
+      messageElement.remove();
+    }
+  });
+  document.body.appendChild(messageElement);
+};
+
+// Обработка отправки формы
+form.addEventListener('submit', async (evt) => {
   evt.preventDefault();
   const isValid = pristine.validate();
   if (isValid) {
-    form.submit();
+    const submitButton = form.querySelector('.img-upload__submit');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Отправка...';
+    const formData = new FormData(form);
+    try {
+      await sendPhotoData(formData);
+      showMessage('success');
+      closeForm();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Ошибка при отправке:', error);
+      showMessage('error');
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = 'Опубликовать';
+    }
   }
 });
 
+// Масштаб изображения
 const scaleControlSmallerButton = form.querySelector('.scale__control--smaller');
 const scaleControlBiggerButton = form.querySelector('.scale__control--bigger');
 const valueInput = form.querySelector('.scale__control--value');
@@ -112,6 +146,7 @@ scaleControlBiggerButton.addEventListener('click', () => {
   }
 });
 
+// Эффекты
 const sliderElement = document.querySelector('.effect-level__slider');
 const effectLevel = document.querySelector('.effect-level__value');
 const effectInputs = document.querySelectorAll('input[name="effect"]');
@@ -148,17 +183,14 @@ const applyFilter = (filter, value, unit) => {
 
 const updateOptions = (min, max, step) => {
   isUpdatingSlider = true;
-
   sliderElement.noUiSlider.updateOptions({
-    range: { min: min, max: max },
-    step: step,
+    range: { min, max },
+    step,
   });
-
   if (effectLevel.value >= max) {
     effectLevel.value = max;
-    sliderElement.noUiSlider.set(effectLevel.value);
+    sliderElement.noUiSlider.set(max);
   }
-
   isUpdatingSlider = false;
 };
 
@@ -186,36 +218,3 @@ effectInputs.forEach((input) => {
     updateImage();
   });
 });
-
-const showMessage = (type) => {
-  const template = document.querySelector(`#${type}`).content.querySelector('section');
-  const messageElement = template.cloneNode(true);
-
-  document.body.appendChild(messageElement);
-};
-
-form.addEventListener('submit', async (evt) => {
-  evt.preventDefault();
-
-  const isValid = pristine.validate();
-  if (isValid) {
-    const submitButton = form.querySelector('.img-upload__submit');
-    submitButton.disabled = true;
-    submitButton.textContent = 'Отправка...';
-
-    const formData = new FormData(form);
-    try {
-      await sendPhotoData(formData);
-      showMessage('success');
-      closeForm();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Ошибка при отправке:', error);
-      showMessage('error');
-    } finally {
-      submitButton.disabled = false;
-      submitButton.textContent = 'Опубликовать';
-    }
-  }
-});
-
