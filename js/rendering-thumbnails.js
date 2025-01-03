@@ -4,6 +4,11 @@ const pictureTemplateContent = document.querySelector('#picture').content.queryS
 const fragment = document.createDocumentFragment();
 
 export const renderThumbnails = (photos) => {
+  const picturesContainer = document.querySelector('.pictures');
+
+  const pictureElements = picturesContainer.querySelectorAll('a.picture');
+  pictureElements.forEach((pictureElement) => pictureElement.remove());
+
   photos.forEach(({ url, description, likes, comments }) => {
     const pictureElement = pictureTemplateContent.cloneNode(true);
 
@@ -25,8 +30,5 @@ export const renderThumbnails = (photos) => {
     });
   });
 
-  const picturesContainer = document.querySelector('.pictures');
-  picturesContainer.innerHTML = '';
   picturesContainer.appendChild(fragment);
 };
-
