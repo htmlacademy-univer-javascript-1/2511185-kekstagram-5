@@ -1,4 +1,7 @@
-import { sendPhotoData } from './api.js';
+import { sendPhotoData, fetchPhotos } from './api.js';
+import { renderThumbnails } from './rendering-thumbnails.js';
+import { pristine } from './formValidator.js';
+import { updateScale } from './imageEffects.js';
 
 
 const uploadInput = document.querySelector('.img-upload__input');
@@ -7,19 +10,9 @@ const form = document.querySelector('.img-upload__form');
 const closeButton = uploadOverlay.querySelector('.img-upload__cancel');
 const hashtagInput = form.querySelector('.text__hashtags');
 const commentInput = form.querySelector('.text__description');
-
-const HASHTAG_PATTERN = /^#[A-Za-zА-Яа-я0-9]{1,20}$/;
-let scaleValue = 100;
-
-// Pristine
-const pristine = new Pristine(form, {
-  classTo: 'img-upload__field-wrapper',
-  errorClass: 'has-danger',
-  successClass: 'has-success',
-  errorTextParent: 'img-upload__field-wrapper',
-  errorTextTag: 'div',
-  errorTextClass: 'form-error'
-});
+const imagePreview = document.querySelector('.img-upload__preview img');
+const imgFilters = document.querySelector('.img-filters');
+const picturesContainer = document.querySelector('.pictures');
 
 const isEscapeKey = (evt) => evt.key === 'Escape';
 
@@ -34,10 +27,10 @@ function closeForm() {
   document.removeEventListener('keydown', handleEscapeKey);
   closeButton.removeEventListener('click', closeForm);
   uploadOverlay.classList.add('hidden');
-  form.reset(); // сброс формы
-  scaleValue = 100;
+  form.reset();
+  imagePreview.src = 'img/upload-default-image.jpg';
   updateScale();
-  pristine.reset(); // сброс проверок
+  pristine.reset();
 }
 
 function openForm() {
@@ -48,57 +41,108 @@ function openForm() {
   updateScale();
 }
 
-function validateHashtags(value) {
-  if (!value) {
-    return { valid: true, message: '' };
-  }
-  const hashtags = value.trim().split(/\s+/);
-  if (hashtags.length > 5) {
-    return { valid: false, message: 'Превышено количество хэш-тегов' };
-  }
-  for (const hashtag of hashtags) {
-    if (!HASHTAG_PATTERN.test(hashtag)) {
-      return { valid: false, message: 'Введён невалидный хэш-тег' };
-    }
-  }
-  const uniqueHashtags = new Set(hashtags.map((hashtag) => hashtag.toLowerCase()));
-  if (uniqueHashtags.size !== hashtags.length) {
-    return { valid: false, message: 'Хэш-теги повторяются' };
-  }
-  return { valid: true, message: '' };
-}
-
-// Подключение валидации к Pristine
-pristine.addValidator(hashtagInput, (value) => validateHashtags(value).valid, (value) => validateHashtags(value).message);
-pristine.addValidator(commentInput, (value) => value.length <= 140, 'Длина комментария не может составлять больше 140 символов');
-
 uploadInput.addEventListener('change', () => {
   if (uploadInput.files.length > 0) {
-    openForm();
+    const file = uploadInput.files[0];
+    const fileReader = new FileReader();
+
+    fileReader.onload = () => {
+      imagePreview.src = fileReader.result;
+      openForm();
+    };
+
+    fileReader.readAsDataURL(file);
   }
 });
 
-// Сообщения об успешной/неуспешной загрузке
 const showMessage = (type) => {
   const template = document.querySelector(`#${type}`).content.querySelector('section');
   const messageElement = template.cloneNode(true);
   const button = messageElement.querySelector('button');
-  button.addEventListener('click', () => messageElement.remove());
+
+  const closeMessage = () => messageElement.remove();
+
+  button.addEventListener('click', closeMessage);
   document.addEventListener('keydown', (evt) => {
     if (isEscapeKey(evt)) {
-      messageElement.remove();
+      closeMessage();
     }
   });
   document.addEventListener('click', (evt) => {
     if (evt.target === messageElement) {
-      messageElement.remove();
+      closeMessage();
     }
   });
+
   document.body.appendChild(messageElement);
 };
 
-// Обработка отправки формы
-form.addEventListener('submit', async (evt) => {
+let allPhotos = [];
+
+const debounce = (func, wait) => {
+  let timeout;
+  return (...args) => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => {
+      func.apply(null, args);
+    }, wait);
+  };
+};
+
+const clearThumbnails = () => {
+  const pictureElements = picturesContainer.querySelectorAll('a.picture');
+  pictureElements.forEach((pictureElement) => pictureElement.remove());
+};
+
+const showRandomImages = () => {
+  clearThumbnails();
+  const randomPhotos = [...allPhotos].sort(() => Math.random() - 0.5).slice(0, 10);
+  renderThumbnails(randomPhotos);
+};
+
+const showDiscussedImages = () => {
+  clearThumbnails();
+  const discussedPhotos = [...allPhotos].sort((a, b) => b.comments.length - a.comments.length);
+  renderThumbnails(discussedPhotos);
+};
+
+const initFilters = () => {
+  imgFilters.classList.remove('img-filters--inactive');
+
+  const handleFilterClick = debounce((evt) => {
+    const selectedFilter = evt.target.id;
+    imgFilters.querySelectorAll('.img-filters__button').forEach((button) => {
+      button.classList.remove('img-filters__button--active');
+    });
+
+    evt.target.classList.add('img-filters__button--active');
+
+    switch (selectedFilter) {
+      case 'filter-default':
+        renderThumbnails(allPhotos);
+        break;
+      case 'filter-random':
+        showRandomImages();
+        break;
+      case 'filter-discussed':
+        showDiscussedImages();
+        break;
+      default:
+        break;
+    }
+  }, 500);
+
+  imgFilters.querySelectorAll('.img-filters__button').forEach((button) => {
+    button.addEventListener('click', handleFilterClick);
+  });
+};
+
+allPhotos = await fetchPhotos();
+renderThumbnails(allPhotos);
+
+const handleFormSubmit = async (evt) => {
   evt.preventDefault();
   const isValid = pristine.validate();
   if (isValid) {
@@ -106,115 +150,24 @@ form.addEventListener('submit', async (evt) => {
     submitButton.disabled = true;
     submitButton.textContent = 'Отправка...';
     const formData = new FormData(form);
+
     try {
       await sendPhotoData(formData);
+      allPhotos = await fetchPhotos();
+      renderThumbnails(allPhotos);
+
+      imgFilters.classList.remove('img-filters--inactive');
+
+      initFilters();
       showMessage('success');
       closeForm();
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Ошибка при отправке:', error);
       showMessage('error');
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = 'Опубликовать';
     }
   }
-});
-
-// Масштаб изображения
-const scaleControlSmallerButton = form.querySelector('.scale__control--smaller');
-const scaleControlBiggerButton = form.querySelector('.scale__control--bigger');
-const valueInput = form.querySelector('.scale__control--value');
-const imagePreview = document.querySelector('.img-upload__preview img');
-
-function updateScale() {
-  valueInput.value = `${scaleValue}%`;
-  imagePreview.style.transform = `scale(${scaleValue / 100})`;
-}
-
-scaleControlSmallerButton.addEventListener('click', () => {
-  if (scaleValue > 25) {
-    scaleValue -= 25;
-    updateScale();
-  }
-});
-
-scaleControlBiggerButton.addEventListener('click', () => {
-  if (scaleValue < 100) {
-    scaleValue += 25;
-    updateScale();
-  }
-});
-
-// Эффекты
-const sliderElement = document.querySelector('.effect-level__slider');
-const effectLevel = document.querySelector('.effect-level__value');
-const effectInputs = document.querySelectorAll('input[name="effect"]');
-const sliderContainer = document.querySelector('.img-upload__effect-level');
-let isUpdatingSlider = false;
-let newFilter = false;
-sliderContainer.style.display = 'none';
-
-const effectSettings = {
-  none: { min: 0, max: 100, step: 1, filter: 'none', unit: '' },
-  chrome: { min: 0, max: 1, step: 0.1, filter: 'grayscale', unit: '' },
-  sepia: { min: 0, max: 1, step: 0.1, filter: 'sepia', unit: '' },
-  marvin: { min: 0, max: 100, step: 1, filter: 'invert', unit: '%' },
-  phobos: { min: 0, max: 3, step: 0.1, filter: 'blur', unit: 'px' },
-  heat: { min: 1, max: 3, step: 0.1, filter: 'brightness', unit: '' },
 };
 
-noUiSlider.create(sliderElement, {
-  range: { min: 0, max: 100 },
-  start: 100,
-  step: 1,
-  connect: 'lower',
-});
-
-const applyFilter = (filter, value, unit) => {
-  if (filter === 'none') {
-    imagePreview.style.filter = 'none';
-    sliderContainer.style.display = 'none';
-  } else {
-    imagePreview.style.filter = `${filter}(${value}${unit})`;
-    sliderContainer.style.display = 'block';
-  }
-};
-
-const updateOptions = (min, max, step) => {
-  isUpdatingSlider = true;
-  sliderElement.noUiSlider.updateOptions({
-    range: { min, max },
-    step,
-  });
-  if (effectLevel.value >= max) {
-    effectLevel.value = max;
-    sliderElement.noUiSlider.set(max);
-  }
-  isUpdatingSlider = false;
-};
-
-const updateImage = () => {
-  if (isUpdatingSlider) {
-    return;
-  }
-  const selectedEffect = document.querySelector('input[name="effect"]:checked').value;
-  const { min, max, step, filter, unit } = effectSettings[selectedEffect];
-  effectLevel.value = newFilter ? 100 : sliderElement.noUiSlider.get();
-  newFilter = false;
-  updateOptions(min, max, step);
-  applyFilter(filter, effectLevel.value, unit);
-};
-
-sliderElement.noUiSlider.on('update', () => {
-  updateImage();
-});
-
-effectInputs.forEach((input) => {
-  input.addEventListener('change', () => {
-    newFilter = true;
-    effectLevel.value = 100;
-    sliderElement.noUiSlider.set(100);
-    updateImage();
-  });
-});
+form.addEventListener('submit', handleFormSubmit);
